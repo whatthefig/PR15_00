@@ -1,9 +1,10 @@
+const { NODE_ENV, JWT_SECRET } = process.env;
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 const MyError = require('../modules/error');
 
-module.exports.findUser = (req, res) => {
+module.exports.findUser = (req, res, next) => {
   const { id } = req.params;
   User.findById(id)
     .then((user) => {
@@ -12,16 +13,16 @@ module.exports.findUser = (req, res) => {
       }
       res.json(user);
     })
-    .catch((err) => res.status(err.code || 500).json({ message: err.message }));
+    .catch(next);
 };
 
-module.exports.getUsers = (req, res) => {
+module.exports.getUsers = (req, res, next) => {
   User.find({})
-    .then((users) => res.send({ users }))
-    .catch((err) => res.status(500).send({ message: err }));
+    .then((users) => res.json(users))
+    .catch(next);
 };
 
-module.exports.createUser = (req, res) => {
+module.exports.createUser = (req, res, next) => {
   const {
     name, about, avatar, email,
   } = req.body;
@@ -29,15 +30,15 @@ module.exports.createUser = (req, res) => {
     .then((hash) => User.create({
       name, about, avatar, email, password: hash,
     }))
-    .then((user) => res.send({ data: user }))
-    .catch((err) => res.status(500).send({ message: err }));
+    .then((user) => res.json(user))
+    .catch(next);
 };
 
-module.exports.login = (req, res) => {
+module.exports.login = (req, res, next) => {
   const { email, password } = req.body;
   return User.findUserByCredentials(email, password)
     .then((user) => {
-      const token = jwt.sign({ _id: user._id }, 'some-secret-key', { expiresIn: '7d' });
+      const token = jwt.sign({ _id: user._id }, NODE_ENV === 'production' ? JWT_SECRET : 'dev', { expiresIn: '7d' });
       res
         .cookie('jwt', token, {
           maxAge: 3600 * 24 * 7,
@@ -45,9 +46,5 @@ module.exports.login = (req, res) => {
         })
         .end();
     })
-    .catch((err) => {
-      res
-        .status(401)
-        .send({ message: err.message });
-    });
+    .catch(next);
 };
